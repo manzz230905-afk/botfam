@@ -1,0 +1,208 @@
+--========================================================
+-- BOT FARM LUA - FIXED VERSION
+--========================================================
+
+-- ==== CONFIG SAFE UPPER ====
+local function toUpperSafe(v) return (type(v) == "string" and v or ""):upper() end
+
+FarmWorldID        = toUpperSafe(FarmWorldID)
+StorageWorld       = toUpperSafe(StorageWorld)
+StorageWorldSeedID = toUpperSafe(StorageWorldSeedID)
+PackDropWorld      = toUpperSafe(PackDropWorld)
+PackDropWorldID    = toUpperSafe(PackDropWorldID)
+PickaxeWorld       = toUpperSafe(PickaxeWorld)
+PickaxeWorldID     = toUpperSafe(PickaxeWorldID)
+
+assert(FarmWorldID ~= "", "Config error: FarmWorldID belum diisi")
+
+bot = getBot()
+world = bot:getWorld()
+inventory = bot:getInventory()
+
+bot.collect_range = 4
+bot.auto_collect = false
+
+-- ==== WEBHOOK HANDLER ====
+local function hasWebhook()
+  return type(WebhookUrl) == "string" and #WebhookUrl > 0
+end
+
+function GonWebhook(msg)
+  if not hasWebhook() then return end
+  local script = [[
+    $webHookUrl = "]]..WebhookUrl..[[" 
+    $color = Get-Random -Minimum 0 -Maximum 16777215
+    $title = 'Shinuqi#2111 - Rotation'
+    $description = "**]]..msg..[[**"
+    $embedObject = [PSCustomObject]@{ color=$color; title=$title; description=$description }
+    [System.Collections.ArrayList]$embedArray = @()
+    $embedArray.Add($embedObject)
+    $payload = [PSCustomObject]@{ embeds = $embedArray }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-RestMethod -Uri $webHookUrl -Body ($payload | ConvertTo-Json -Depth 4) -Method Post -ContentType 'application/json'
+  ]]
+  local pipe = io.popen("powershell -command -", "w")
+  pipe:write(script)
+  pipe:close()
+end
+
+-- ==== JOIN FIXED ====
+function join(worldName, id)
+  local tries = 0
+  while true do
+    sleep(3000)
+    bot:sendPacket(3, "action|join_request\nname|"..worldName.."|"..id.."\ninvitedWorld|0")
+    sleep(6000)
+    local Dunyadami = tostring(world.name or "")
+    if Dunyadami ~= "" and Dunyadami ~= "EXIT" then
+      AnlikYer()
+      if world:getTile(Botx, Boty).fg ~= 6 then
+        return -- sukses join
+      end
+    end
+    tries = tries + 1
+    if tries >= 5 then
+      GonWebhook("Gagal join ke "..tostring(worldName).." setelah 5 percobaan")
+      tries = 0
+    end
+  end
+end
+
+-- ==== SCAN / COUNTERS ====
+function scanTree(id)
+  local countReady, countUnready = 0, 0
+  for _, tile in pairs(world:getTiles()) do 
+    if tile.fg == id and tile:canHarvest() then
+      countReady = countReady + 1
+    else
+      countUnready = countUnready + 1
+    end
+  end
+  countUnready = countUnready - 3360
+  return { Ready = countReady, Unready = countUnready }
+end
+
+function tarama(ids)
+  local fosel = 0
+  for _, tile in pairs(world:getTiles()) do 
+    if tile.fg == ids then fosel = fosel + 1 end
+  end
+  return { miktr = fosel }
+end
+
+function floats(idz)
+  local float = 0
+  for _, obj in pairs(world:getObjects()) do 
+    if obj.id == idz then float = float + obj.count end
+  end
+  return { ucanlar = float }
+end
+
+-- ==== POSITION CONTROL ====
+function AnlikYer()
+  if bot.status ~= 1 then
+    GonWebhook("Bot Offline")
+    while bot.status ~= 1 do bot:connect() sleep(10000) end
+    sleep(5000)
+    GonWebhook("Bot Back To Online")
+  end
+  Dunyadami = tostring(world.name)
+  if Dunyadami ~= "" and Dunyadami ~= "EXIT" then
+    local localbot = world:getLocal()
+    if localbot then
+      Botx = math.floor(localbot.posx / 32) 
+      Boty = math.floor(localbot.posy / 32)
+    end
+  end
+end
+
+-- ==== SIMPLE TILE GETTERS ====
+function tilealfg(x,y)
+  AnlikYer()
+  local Dunyadami = tostring(world.name)
+  if Dunyadami ~= "" and Dunyadami ~= "EXIT" then
+    return { tilefg = world:getTile(x,y).fg }
+  end
+end
+function tilealbg(x,y)
+  AnlikYer()
+  local Dunyadami = tostring(world.name)
+  if Dunyadami ~= "" and Dunyadami ~= "EXIT" then
+    return { tilebg = world:getTile(x,y).bg }
+  end
+end
+
+-- ==== SIMPLE UTIL ====
+local function ensureOn(x,y)
+  if not bot:isInTile(x,y) then
+    bot:findPath(x,y)
+    sleep(800)
+  end
+end
+
+-- ==== PNB FIXED ====
+BotPxz = BotPx-1
+BotPyz = BotPy-1
+function PNB(list)
+  PickaxeControl()
+  bot.auto_collect = true
+  bot:findPath(BotPxz,BotPyz)
+  sleep(2000)
+  while inventory:getItemCount(BlockID) > 0 do
+    AnlikYer()
+    if BotPxz ~= Botx and BotPyz ~= Boty then
+      bot:findPath(BotPxz,BotPyz)
+      sleep(2000)
+      AnlikYer()
+    end
+    -- kiri tile
+    if tilealfg(Botx-1,Boty).tilefg == 0 then
+      ensureOn(Botx,Boty)
+      bot:place(Botx-1,Boty,BlockID)
+      sleep(delayplace)
+    end
+    -- bawah kiri
+    if tilealfg(Botx-1,Boty+1).tilefg == 0 then
+      ensureOn(Botx,Boty)
+      bot:place(Botx-1,Boty+1,BlockID)
+      sleep(delayplace)
+    end
+    -- atas kiri
+    if tilealfg(Botx-1,Boty-1).tilefg == 0 then
+      ensureOn(Botx,Boty)
+      bot:place(Botx-1,Boty-1,BlockID)
+      sleep(delayplace)
+    end
+    -- hajar kiri
+    while (tilealfg(Botx-1,Boty).tilefg ~= 0 or tilealbg(Botx-1,Boty).tilebg ~= 0) do
+      ensureOn(Botx,Boty)
+      bot:hit(Botx-1,Boty)
+      sleep(delaybreak)
+    end
+  end
+end
+
+-- ==== SECOND COUNTER ====
+startT = os.time()
+function SecondTT(seconds)
+  local s = tonumber(seconds)
+  if s <= 0 then return "00:00:00" end
+  local hours = string.format("%02.f", math.floor(s/3600));
+  local mins = string.format("%02.f", math.floor(s/60 - (hours*60)));
+  local secs = string.format("%02.f", math.floor(s - hours*3600 - mins*60));
+  return hours..":"..mins..":"..secs
+end
+
+-- ==== LOOP UTAMA (sederhana contoh) ====
+isOwner = true
+while isOwner do
+  for _, list in pairs(Bots[bot.name].farmWorlds) do
+    list = string.upper(list)
+    join(list,FarmWorldID)
+    GonWebhook("Bot "..bot.name.." sedang di world "..world.name..
+      "\n Ready Tree: "..scanTree(BlockID+1).Ready..
+      "\n Fossil: "..tarama(3918).miktr..
+      "\n UpTime: "..SecondTT(os.difftime(os.time(), startT)))
+    sleep(5000)
+  end
+end
